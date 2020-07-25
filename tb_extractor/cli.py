@@ -1,10 +1,10 @@
 from pathlib import Path
 import click
 
-from .extractor import dataframe
+import tb_extractor.extractor as extractor
+import tb_extractor.aggregator as aggregator
 
-def path_callback(ctx, param, value):
-    if value is not None:
+def path_callback(ctx, param, value): if value is not None:
         return Path(value)
 
 def path_callback(ctx, param, value):
@@ -21,11 +21,12 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 @click.option("--block", type=str, multiple=True, help="Tags to block.")
 @click.option("--name", type=str, default='extracted.csv', help="Name of csv in recursive mode.")
 @click.option(
-    "--everything",
+    'everything',
+    "--downsampled/--all-samples",
     type=bool,
     is_flag=True,
     default=False,
-    help="Extract all data, otherwise downsampled according to Tensorboard backend defaults.",
+    help="Downsampled according to Tensorboard backend defaults.",
 )
 
 def main(logdir: str, output_dir: Path, recursive: bool, name: str, **kwargs):
@@ -34,15 +35,20 @@ def main(logdir: str, output_dir: Path, recursive: bool, name: str, **kwargs):
         LOGDIR: Path to event file or directory of event file. Directory if in recursive mode.
         OUTPUT_DIR: Path of output file. Directory if in recursive mode.
     """
-    if recursive:
+    if recursive or aggregator:
         logdir = Path(logdir)
         event_dirs = list(set([i.parent for i in logdir.glob('**/*event*')]))
-        for i in event_dirs:
-            frame = dataframe(i, **kwargs)
-            current_out = output_dir / i / name
-            current_out.parent.mkdir(exist_ok=True, parents=True)
-            frame.to_csv(current_out)
+        frames = extractor.frames(*event_dirs) 
+
+        if aggregator:
+            aggregated = aggregator.aggregator(*frames)
+            write = [(aggregated, output_dir)]
+        else:
+            output_dirs = [output_dir / i / name for i in event_dirs]
+            write = zip(frames, output_dirs)
     else:
-        frame = dataframe(logdir, **kwargs)
-        output_dir.parent.mkdir(exist_ok=True, parents=True)
-        frame.to_csv(output_dir)
+        write = (extractor.frames(*[logdir][0], output_dir)
+
+    for frame, write_dir in write:
+        write_dir.parent.mkdir(exist_ok=True, parents=True)
+        frame.to_csv(write_dir)

@@ -16,7 +16,10 @@ TENSOR_RESERVOIR = {
     "value_decoder": lambda x: tf.make_ndarray(x),
 }
 
-def dataframe(path, block, reservoirs=[SCALAR_RESERVOIR, TENSOR_RESERVOIR], everything=False):
+def frames(*directories, **kwargs):
+    return [dataframe(d, **kwargs) for d in *directories]
+    
+def dataframe(path, block=[], reservoirs=[SCALAR_RESERVOIR, TENSOR_RESERVOIR], everything=False):
     if everything:
         size_guidance = STORE_EVERYTHING_SIZE_GUIDANCE
     else:
